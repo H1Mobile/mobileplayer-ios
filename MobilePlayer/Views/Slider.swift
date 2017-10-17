@@ -23,7 +23,7 @@ class Slider: UIView {
   var value: Float = 0           { didSet { setNeedsLayout() } }
   var availableValue: Float = 0  { didSet { setNeedsLayout() } }
   var maximumValue: Float = 1    { didSet { setNeedsLayout() } }
-
+  var seekValue: Float = -1
   let maximumTrack = UIView(frame: .zero)
   let availableTrack = UIView(frame: .zero)
   let minimumTrack = UIView(frame: .zero)
@@ -62,27 +62,36 @@ class Slider: UIView {
   // MARK: Setters
 
   func setValue(value: Float, animatedForDuration duration: TimeInterval) {
-    self.value = value
+    if seekValue != -1 {
+        self.value = seekValue
+        seekValue = -1
+    } else {
+        self.value = value
+    }
+
     if duration > 0 {
-      UIView.animate(
-        withDuration: duration,
-        delay: 0,
-        options: .allowUserInteraction,
-        animations: {
-          self.layoutIfNeeded()
+        UIView.animate(
+            withDuration: duration,
+            delay: 0,
+            options: .allowUserInteraction,
+            animations: {
+                self.layoutIfNeeded()
         },
-        completion: nil)
+            completion: nil)
     }
   }
 
   func setAvailableValue(availableValue: Float, animatedForDuration duration: TimeInterval) {
     self.availableValue = availableValue
     if duration > 0 {
-      UIView.animate(
-        withDuration: duration,
-        animations: {
-          self.layoutIfNeeded()
-      })
+        UIView.animate(
+            withDuration: duration,
+            delay: 0,
+            options: .allowUserInteraction,
+            animations: {
+                self.layoutIfNeeded()
+        },
+            completion: nil)
     }
   }
 
@@ -102,6 +111,7 @@ class Slider: UIView {
         targetX = trackWidth
       }
       value = minimumValue + (maximumValue - minimumValue) * Float(targetX / trackWidth)
+      seekValue = value
       if recognizer.state == .changed {
         delegate?.sliderThumbDidPan(slider: self)
       } else {

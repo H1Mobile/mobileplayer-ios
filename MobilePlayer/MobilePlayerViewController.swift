@@ -43,7 +43,7 @@ open class MobilePlayerViewController: MPMoviePlayerViewController {
   // MARK: Player Configuration
 
   // TODO: Move inside MobilePlayerConfig
-  private static let playbackInterfaceUpdateInterval = 0.25
+  private static let playbackInterfaceUpdateInterval = 0.45
 
   /// The global player configuration object that is loaded by a player if none is passed for its
   /// initialization.
@@ -72,7 +72,7 @@ open class MobilePlayerViewController: MPMoviePlayerViewController {
   private var isFirstPlay = true
   fileprivate var seeking = false
   fileprivate var wasPlayingBeforeSeek = false
-  private var playbackInterfaceUpdateTimer: Timer?
+  fileprivate var playbackInterfaceUpdateTimer: Timer?
   private var hideControlsTimer: Timer?
 
   // MARK: Initialization
@@ -229,15 +229,19 @@ open class MobilePlayerViewController: MPMoviePlayerViewController {
   open override func viewDidLoad() {
     super.viewDidLoad()
     view.addSubview(controlsView)
-    playbackInterfaceUpdateTimer = Timer.scheduledTimerWithTimeInterval(
-      ti: MobilePlayerViewController.playbackInterfaceUpdateInterval,
-      callback: { [weak self] in self?.updatePlaybackInterface() },
-      repeats: true)
+    createTimerInterfaceUpdate()
     if let prerollViewController = prerollViewController {
       shouldAutoplay = false
       showOverlayViewController(prerollViewController)
     }
   }
+
+    func createTimerInterfaceUpdate() {
+        playbackInterfaceUpdateTimer = Timer.scheduledTimerWithTimeInterval(
+            ti: MobilePlayerViewController.playbackInterfaceUpdateInterval,
+            callback: { [weak self] in self?.updatePlaybackInterface() },
+            repeats: true)
+    }
 
   /// Called to notify the view controller that its view is about to layout its subviews.
   ///
@@ -513,15 +517,23 @@ open class MobilePlayerViewController: MPMoviePlayerViewController {
 
   private func updatePlaybackInterface() {
     if let playbackSlider = getViewForElementWithIdentifier("playback") as? Slider {
-      playbackSlider.maximumValue = Float(moviePlayer.duration.isNormal ? moviePlayer.duration : 0)
-      if !seeking {
-        let sliderValue = Float(moviePlayer.currentPlaybackTime.isNormal ? moviePlayer.currentPlaybackTime : 0)
-        playbackSlider.setValue(value: sliderValue, animatedForDuration: MobilePlayerViewController.playbackInterfaceUpdateInterval)
-      }
-      let availableValue = Float(moviePlayer.playableDuration.isNormal ? moviePlayer.playableDuration : 0)
-      playbackSlider.setAvailableValue(
-        availableValue: availableValue,
-        animatedForDuration: MobilePlayerViewController.playbackInterfaceUpdateInterval)
+        if moviePlayer.duration.isNormal {
+            playbackSlider.maximumValue = Float(moviePlayer.duration.isNormal ? moviePlayer.duration : 0)
+        }
+        
+        if !seeking {
+            if moviePlayer.currentPlaybackTime.isNormal {
+                let sliderValue = Float( moviePlayer.currentPlaybackTime)
+                playbackSlider.setValue(value: sliderValue, animatedForDuration: MobilePlayerViewController.playbackInterfaceUpdateInterval)
+                
+            }
+        }
+        
+        if moviePlayer.playableDuration.isNormal {
+            playbackSlider.setAvailableValue(
+                availableValue:  Float(moviePlayer.playableDuration),
+                animatedForDuration: MobilePlayerViewController.playbackInterfaceUpdateInterval)
+        }
     }
     if let currentTimeLabel = getViewForElementWithIdentifier("currentTime") as? Label {
       currentTimeLabel.text = textForPlaybackTime(time: moviePlayer.currentPlaybackTime)
@@ -625,6 +637,8 @@ extension MobilePlayerViewController: MobilePlayerOverlayViewControllerDelegate 
 extension MobilePlayerViewController: SliderDelegate {
 
   func sliderThumbPanDidBegin(slider: Slider) {
+    playbackInterfaceUpdateTimer?.invalidate()
+    playbackInterfaceUpdateTimer = nil
     seeking = true
     wasPlayingBeforeSeek = (state == .playing)
     pause()
@@ -634,9 +648,15 @@ extension MobilePlayerViewController: SliderDelegate {
 
   func sliderThumbPanDidEnd(slider: Slider) {
     seeking = false
-    moviePlayer.currentPlaybackTime = TimeInterval(slider.value)
     if wasPlayingBeforeSeek {
-      play()
+        self.moviePlayer.currentPlaybackTime = TimeInterval(slider.value)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            self.moviePlayer.currentPlaybackTime = TimeInterval(slider.value)
+            self.play()
+        }
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+        self.createTimerInterfaceUpdate()
     }
   }
 }
